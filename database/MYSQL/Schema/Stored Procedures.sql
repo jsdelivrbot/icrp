@@ -1,5 +1,91 @@
 DELIMITER //
 
+/*****************************************************************************************/
+-- PROCEDURE `ToIntTable`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `ToIntTable`//
+
+CREATE PROCEDURE `ToIntTable`(
+	IN `@input` LONGTEXT
+)
+LANGUAGE SQL
+NOT DETERMINISTIC
+CONTAINS SQL
+SQL SECURITY DEFINER
+COMMENT ''
+BEGIN
+	DECLARE `@sql` LONGTEXT DEFAULT '';
+    
+    DROP TEMPORARY TABLE IF EXISTS ToIntTable;
+	CREATE TEMPORARY TABLE IF NOT EXISTS ToIntTable (
+		VALUE INT
+	);
+	
+	-- SET group_concat_max_len=100000 
+	IF `@input` IS NOT NULL THEN
+	
+	drop temporary table if exists temp;
+
+		create temporary table temp( val INT );
+		
+		set @sql = concat("insert into temp (val) values (", 
+							replace((select group_concat(`@input`) as data from t), ",", "),("),
+							");"                            
+						 );
+		
+		prepare stmt1 from @sql;
+		execute stmt1;
+		insert into ToIntTable select distinct(val) from temp;
+
+	END IF;
+END//
+
+
+/*****************************************************************************************/
+-- PROCEDURE `ToStrTable`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `ToStrTable`//
+
+CREATE PROCEDURE `ToStrTable`(
+	IN `@input` LONGTEXT
+)
+LANGUAGE SQL
+NOT DETERMINISTIC
+CONTAINS SQL
+SQL SECURITY DEFINER
+COMMENT ''
+BEGIN
+	DECLARE `@sql` LONGTEXT DEFAULT '';
+    
+	DROP TEMPORARY TABLE IF EXISTS ToStrTable;
+	CREATE TEMPORARY TABLE IF NOT EXISTS ToStrTable (
+		VALUE VARCHAR(50)
+	);
+    
+    -- SET group_concat_max_len=100000 
+	IF `@input` IS NOT NULL THEN
+	
+	drop temporary table if exists temp;
+
+		create temporary table temp( val VARCHAR(50) );
+		
+		set @sql = concat("insert into temp (val) values ('", 
+							replace((select group_concat(`@input`) as data from t), ",", "'),('"),
+							"');"                            
+						 );
+		
+		prepare stmt1 from @sql;
+		execute stmt1;
+		insert into ToStrTable select distinct(val) from temp;
+
+	END IF;
+END//
+
+
+/*****************************************************************************************/
+-- PROCEDURE `DeleteOldSearchResults`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `DeleteOldSearchResults`//
 
 CREATE PROCEDURE `DeleteOldSearchResults`()
 LANGUAGE SQL
@@ -28,6 +114,12 @@ BEGIN
 END//
 
 
+
+/*****************************************************************************************/
+-- PROCEDURE `UpdateSearchResultMarkEmailSent`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `UpdateSearchResultMarkEmailSent`//
+
 CREATE PROCEDURE `UpdateSearchResultMarkEmailSent`(
   IN `@SearchID` INT
 )
@@ -40,6 +132,11 @@ UPDATE `SearchResult` SET
   `IsEmailSent` = 1
 WHERE `SearchCriteriaID` = `@SearchID`//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetPartners`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetPartners`//
 
 CREATE PROCEDURE `GetPartners`()
 LANGUAGE SQL
@@ -57,6 +154,11 @@ SELECT
 FROM `Partner`
 ORDER BY `Country`, `Name`//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetFundingOrgs`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetFundingOrgs`//
 
 CREATE PROCEDURE `GetFundingOrgs`(
   IN `@type` VARCHAR(15)
@@ -85,6 +187,10 @@ FROM `FundingOrg`
 WHERE `MemberStatus` = 'Current' AND (`@type` = 'funding' OR (`@type` = 'Search' AND `LastImportDate` IS NOT NULL))
 ORDER BY `SponsorCode`, `Name`//
 
+/*****************************************************************************************/
+-- PROCEDURE `GetPartnerOrgs`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetPartnerOrgs`//
 
 CREATE PROCEDURE `GetPartnerOrgs`()
 LANGUAGE SQL
@@ -94,6 +200,11 @@ SQL SECURITY DEFINER
 COMMENT ''
 SELECT PartnerOrgID AS ID, CONCAT(SponsorCode,' - ',Name) AS Name , IsActive FROM PartnerOrg ORDER BY SponsorCode, Name//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetLibraries`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetLibraries`//
 
 CREATE PROCEDURE `GetLibraries`()
 LANGUAGE SQL
@@ -114,6 +225,12 @@ FROM `Library` l
   JOIN `LibraryFolder` p ON f.ParentFolderID= p.LibraryFolderID//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetLibraryFolders`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetLibraryFolders`//
+
+
 CREATE PROCEDURE `GetLibraryFolders`()
 LANGUAGE SQL
 NOT DETERMINISTIC
@@ -126,6 +243,12 @@ SELECT
   f.`isPublic`
 FROM `LibraryFolder` f
 JOIN `LibraryFolder` p ON f.`ParentFolderID` = p.`LibraryFolderID`//
+
+
+/*****************************************************************************************/
+-- PROCEDURE `GetLatestNewsletter`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetLatestNewsletter`//
 
 
 CREATE PROCEDURE `GetLatestNewsletter`()
@@ -144,6 +267,11 @@ FROM `Library` l
 WHERE f.`Name` = 'Newsletters'
 ORDER BY l.`CreatedDate` DESC
 LIMIT 1//
+
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectDetail`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectDetail`//
 
 
 CREATE PROCEDURE `GetProjectDetail`(
@@ -178,6 +306,12 @@ FROM `Project` p
 WHERE p.`ProjectID` = `@ProjectID`//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectCSO`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectCSO`//
+
+
 CREATE PROCEDURE `GetProjectCSO`(
   IN `@ProjectFundingID` INT
 )
@@ -198,6 +332,12 @@ WHERE f.`ProjectFundingID` = `@ProjectFundingID`
 ORDER BY c.`Name`//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectCancerType`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectCancerType`//
+
+
 CREATE PROCEDURE `GetProjectCancerType`(
   IN `@ProjectFundingID` INT
 )
@@ -216,6 +356,12 @@ FROM `ProjectFunding` f
   JOIN `CancerType` t ON ct.`CancerTypeID` = t.`CancerTypeID`
 WHERE f.`ProjectFundingID` = `@ProjectFundingID` AND IFNULL(ct.`RelSource`,'') = 'S'  -- only return 'S' relSource
 ORDER BY t.`Name`//
+
+
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectFunding`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectFunding`//
 
 
 CREATE PROCEDURE `GetProjectFunding`(
@@ -248,6 +394,12 @@ FROM `Project` p
   JOIN `FundingOrg` o ON o.`FundingOrgID` = pf.`FundingOrgID`
 WHERE p.`ProjectID` = 30000
 ORDER BY pf.`BudgetStartDate` DESC, p.`ProjectID` DESC//
+
+
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectFundingDetail`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectFundingDetail`//
 
 
 CREATE PROCEDURE `GetProjectFundingDetail`(
@@ -287,6 +439,12 @@ FROM `ProjectFunding` f
 WHERE f.`ProjectFundingID` = `@ProjectFundingID`//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetCancerTypeLookUp`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetCancerTypeLookUp`//
+
+
 CREATE PROCEDURE `GetCancerTypeLookUp`()
 LANGUAGE SQL
 NOT DETERMINISTIC
@@ -302,6 +460,11 @@ FROM `CancerType`
 ORDER BY `Name`//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetCountryCodeLookup`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetCountryCodeLookup`//
+
 CREATE PROCEDURE `GetCountryCodeLookup`()
 LANGUAGE SQL
 NOT DETERMINISTIC
@@ -314,6 +477,11 @@ SELECT
 FROM `Country`
 ORDER BY `Code`//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetCSOLookup`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetCSOLookup`//
 
 CREATE PROCEDURE `GetCSOLookup`()
 LANGUAGE SQL
@@ -331,6 +499,11 @@ WHERE `IsActive` = 1
 ORDER BY `Code`//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetCurrencyRateLookup`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetCurrencyRateLookup`//
+
 CREATE PROCEDURE `GetCurrencyRateLookup`()
 LANGUAGE SQL
 NOT DETERMINISTIC
@@ -346,6 +519,11 @@ SELECT
 FROM `CurrencyRate`
 ORDER BY `Year` DESC, `FromCurrency`, `ToCurrency`//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetInstitutionLookup`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetInstitutionLookup`//
 
 CREATE PROCEDURE `GetInstitutionLookup`()
 LANGUAGE SQL
@@ -366,6 +544,11 @@ FROM `Institution`
 WHERE `Name` <> 'Missing'
 ORDER BY `Name`//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectTypeStatsBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectTypeStatsBySearchID`//
 
 CREATE PROCEDURE `GetProjectTypeStatsBySearchID`(
   IN `@SearchID` INT,
@@ -428,6 +611,11 @@ BEGIN
   DROP TEMPORARY TABLE IF EXISTS `stats`;
 END//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectCancerTypeStatsBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectCancerTypeStatsBySearchID`//
 
 CREATE PROCEDURE `GetProjectCancerTypeStatsBySearchID`(
   IN `@SearchID` INT,
@@ -497,6 +685,11 @@ BEGIN
 END//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectCountryStatsBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectCountryStatsBySearchID`//
+
 CREATE PROCEDURE `GetProjectCountryStatsBySearchID`(
   IN `@SearchID` INT,
   IN `@Year` INT,
@@ -559,6 +752,11 @@ BEGIN
   END IF;
 END//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectCSOStatsBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectCSOStatsBySearchID`//
 
 CREATE PROCEDURE `GetProjectCSOStatsBySearchID`(
   IN `@SearchID` INT,
@@ -626,6 +824,11 @@ BEGIN
 END//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectAwardStatsBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectAwardStatsBySearchID`//
+
 CREATE PROCEDURE `GetProjectAwardStatsBySearchID`(
   IN `@SearchID` INT,
   IN `@Year` INT,
@@ -681,6 +884,11 @@ BEGIN
 END//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetDataUploadInStaging`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetDataUploadInStaging`//
+
 CREATE PROCEDURE `GetDataUploadInStaging`()
 LANGUAGE SQL
 NOT DETERMINISTIC
@@ -693,6 +901,12 @@ WHERE `Status` = 'Staging'
 ORDER BY `ReceivedDate` DESC//
 
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetDataUploadStatus`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetDataUploadStatus`//
+
 CREATE PROCEDURE `GetDataUploadStatus`()
 LANGUAGE SQL
 NOT DETERMINISTIC
@@ -704,6 +918,11 @@ FROM `DataUploadStatus` u
 LEFT JOIN `DataUploadLog` l ON u.`DataUploadStatusID` = l.`DataUploadStatusID`
 ORDER BY `ReceivedDate` DESC//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetDataUploadSummary`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetDataUploadSummary`//
 
 CREATE PROCEDURE `GetDataUploadSummary`(
   IN `@DataUploadID` INT
@@ -718,10 +937,15 @@ FROM `DataUploadLog`
 WHERE `DataUploadStatusID`=`@DataUploadID`//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectsByDataUploadID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectsByDataUploadID`//
+
 CREATE PROCEDURE `GetProjectsByDataUploadID`(
   IN `@PageSize` INT,
   IN `@PageNumber` INT,
-  IN `@SortCol` VARCHAR(7),
+  IN `@SortCol` VARCHAR(25),
   IN `@SortDirection` VARCHAR(4),
   IN `@DataUploadID` INT,
   OUT `@SearchCriteriaID` INT,
@@ -811,7 +1035,7 @@ BEGIN
     CASE WHEN `@SortDirection` = 'ASC' THEN 
       CASE
         WHEN `@SortCol` = 'code' THEN p.`AwardCode`
-        WHEN `@SortCol` = 'pi' THEN CONCAT(pi.`LastName`, ' ', pi.`FirstName`)
+        WHEN `@SortCol` = 'pi' THEN CONCAT(IFNULL(pi.`LastName`, ""), ' ', IFNULL(pi.`FirstName`, ""))
         WHEN `@SortCol` = 'Inst' THEN i.`Name`
         WHEN `@SortCol` = 'city' THEN i.`City`
         WHEN `@SortCol` = 'state' THEN i.`State`
@@ -823,7 +1047,7 @@ BEGIN
     CASE WHEN `@SortDirection` = 'DESC' THEN 
       CASE
         WHEN `@SortCol` = 'code' THEN p.`AwardCode`
-        WHEN `@SortCol` = 'pi' THEN CONCAT(pi.`LastName`, ' ', pi.`FirstName`)
+        WHEN `@SortCol` = 'pi' THEN CONCAT(IFNULL(pi.`LastName`, ""), ' ', IFNULL(pi.`FirstName`, ""))
         WHEN `@SortCol` = 'Inst' THEN i.`Name`
         WHEN `@SortCol` = 'city' THEN i.`City`
         WHEN `@SortCol` = 'state' THEN i.`State`
@@ -837,10 +1061,15 @@ BEGIN
 END//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectsBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectsBySearchID`//
+
 CREATE PROCEDURE `GetProjectsBySearchID`(
   IN `@PageSize` INT,
   IN `@PageNumber` INT,
-  IN `@SortCol` VARCHAR(7),
+  IN `@SortCol` VARCHAR(25),
   IN `@SortDirection` VARCHAR(4),
   IN `@SearchID` INT,
   OUT `@ResultCount` INT
@@ -904,7 +1133,7 @@ BEGIN
     CASE WHEN `@SortDirection` = 'ASC' THEN 
       CASE
         WHEN `@SortCol` = 'code' THEN p.`AwardCode`
-        WHEN `@SortCol` = 'pi' THEN CONCAT(pi.`LastName`, ' ', pi.`FirstName`)
+        WHEN `@SortCol` = 'pi' THEN CONCAT(IFNULL(pi.`LastName`, ""), ' ', IFNULL(pi.`FirstName`, ""))
         WHEN `@SortCol` = 'Inst' THEN i.`Name`
         WHEN `@SortCol` = 'city' THEN i.`City`
         WHEN `@SortCol` = 'state' THEN i.`State`
@@ -916,7 +1145,7 @@ BEGIN
     CASE WHEN `@SortDirection` = 'DESC' THEN 
       CASE
         WHEN `@SortCol` = 'code' THEN p.`AwardCode`
-        WHEN `@SortCol` = 'pi' THEN CONCAT(pi.`LastName`, ' ', pi.`FirstName`)
+        WHEN `@SortCol` = 'pi' THEN CONCAT(IFNULL(pi.`LastName`, ""), ' ', IFNULL(pi.`FirstName`, ""))
         WHEN `@SortCol` = 'Inst' THEN i.`Name`
         WHEN `@SortCol` = 'city' THEN i.`City`
         WHEN `@SortCol` = 'state' THEN i.`State`
@@ -929,6 +1158,11 @@ BEGIN
   OFFSET `@PageOffset`;
 END//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetSearchCriteriaBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetSearchCriteriaBySearchID`//
 
 CREATE PROCEDURE `GetSearchCriteriaBySearchID`(
   IN `@SearchID` INT
@@ -1076,6 +1310,11 @@ BEGIN
 END//
 
 
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectExportsBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectExportsBySearchID`//
+
 CREATE PROCEDURE `GetProjectExportsBySearchID`(
   IN `@SearchID` INT,
   IN `@IncludeAbstract` INT,
@@ -1193,6 +1432,12 @@ BEGIN
 END//
 
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectCSOsBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectCSOsBySearchID`//
+
 CREATE PROCEDURE `GetProjectCSOsBySearchID`(
   IN `@SearchID` INT
 )
@@ -1221,6 +1466,12 @@ BEGIN
 END//
 
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectCancerTypesBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectCancerTypesBySearchID`//
+
 CREATE PROCEDURE `GetProjectCancerTypesBySearchID`(
   IN `@SearchID` INT
 )
@@ -1248,6 +1499,11 @@ BEGIN
   ORDER BY f.`ProjectID`;
 END//
 
+
+/*****************************************************************************************/
+-- PROCEDURE `GetProjectExportsSingleBySearchID`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetProjectExportsSingleBySearchID`//
 
 CREATE PROCEDURE `GetProjectExportsSingleBySearchID`(
   IN `@SearchID` INT,
