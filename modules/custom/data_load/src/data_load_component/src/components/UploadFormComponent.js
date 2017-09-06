@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 
 import {
+    Alert,
     Form,
     Button,
     Col,
@@ -30,13 +31,13 @@ class UploadFormComponent extends Component {
         this.updateParent = this.updateParent.bind(this);
         this.resetParent = this.resetParent.bind(this);
         this.state = {
-            uploadType: 'new', 
-            sponsorCodes: [], 
-            sponsorCode: '', 
-            sponsorCodeValid: true, 
-            submissionDate: '', 
-            submissionDateValid: true, 
-            submitDisabled: true, 
+            uploadType: 'New',
+            sponsorCodes: [],
+            sponsorCode: '',
+            sponsorCodeValid: true,
+            submissionDate: '',
+            submissionDateValid: true,
+            submitDisabled: true,
             loading: false
         }
 
@@ -45,7 +46,7 @@ class UploadFormComponent extends Component {
 
     /** Sends the response up to the parent */
     updateParent(stats, columns, projects) {
-        this.props.onFileUploadSuccess(stats, columns, projects, this.state.sponsorCode, this.state.uploadType, this.state.originalFileName);
+        this.props.onFileUploadSuccess(stats, columns, projects, this.state.sponsorCode, this.state.uploadType, this.state.originalFileName, this.state.submissionDate.format("YYYY-MM-DD"));
     }
 
     resetParent() {
@@ -121,7 +122,7 @@ class UploadFormComponent extends Component {
 
     /** Resets the form */
     handleReset() {
-        this.setState({ uploadType: 'new', sponsorCode: '', sponsorCodeValid: true, submissionDate: '', submissionDateValid: true, fileId: '', submitDisabled: true, controlsDisabled: false });
+        this.setState({ uploadType: 'New', sponsorCode: '', sponsorCodeValid: true, submissionDate: '', submissionDateValid: true, fileId: '', submitDisabled: true, controlsDisabled: false });
         document.getElementById("fileId").value = null;
         this.resetParent();
     }
@@ -162,14 +163,20 @@ class UploadFormComponent extends Component {
         } else {
             // response.status, response.statusText
             let message = await response.text();
-            that.handleReset();
-            alert("Oops! " + message);
+            //that.handleReset();
+            this.setState({loading: false, errorMessage: message});
         }
     }
 
     render() {
         return (
             <div>
+                {this.state.errorMessage &&
+                    <Alert
+                        bsStyle="danger"
+                        onDismiss={ev => this.setState({errorMessage: null})}>
+                        { this.state.errorMessage }
+                    </Alert>}
                 <Spinner message="Loading Workbook..." visible={this.state.loading} />
                 <Panel onClick={this.handleClick}>
                     <Form horizontal>
@@ -182,9 +189,9 @@ class UploadFormComponent extends Component {
                                 </Col>
 
                                 <Col xs={12} sm={8}>
-                                    <Radio name="uploadType" inline value="new" onChange={this.handleInputChange} checked={this.state.uploadType === 'new'} disabled={this.state.controlsDisabled}>New</Radio>
+                                    <Radio name="uploadType" inline value="New" onChange={this.handleInputChange} checked={this.state.uploadType === 'New'} disabled={this.state.controlsDisabled}>New</Radio>
                                     {' '}
-                                    <Radio name="uploadType" inline value="update" onChange={this.handleInputChange} checked={this.state.uploadType === 'update'} disabled={true /*this.state.controlsDisabled*/}>Update</Radio>
+                                    <Radio name="uploadType" inline value="Update" onChange={this.handleInputChange} checked={this.state.uploadType === 'Update'} disabled={true /*this.state.controlsDisabled*/}>Update</Radio>
                                 </Col>
                             </FormGroup>
 
@@ -194,21 +201,21 @@ class UploadFormComponent extends Component {
                                     <div className="no-wrap">Sponsor Code <span className="red-text">*</span></div>
                                 </Col>
                                 <Col xs={12} sm={8}>
-                                    {/* <FormControl type="text" name="sponsorCode" placeholder="Enter sponsor code" value={this.state.sponsorCode} onChange={this.handleInputChange}disabled={this.state.controlsDisabled} />  
+                                    {/* <FormControl type="text" name="sponsorCode" placeholder="Enter sponsor code" value={this.state.sponsorCode} onChange={this.handleInputChange}disabled={this.state.controlsDisabled} />
                                     */}
-                                    <FormControl 
+                                    <FormControl
                                         name="sponsorCode"
-                                        componentClass="select" 
-                                        value={this.state.sponsorCode} 
+                                        componentClass="select"
+                                        value={this.state.sponsorCode}
                                         onChange={this.handleInputChange}
                                         disabled={this.state.controlsDisabled}
-                                        required> 
+                                        required>
                                         <option value="" disabled hidden>Select a sponsor code</option>
                                         {
                                             this.state.sponsorCodes.map(code => <option value={code}>{code}</option>)
                                         }
                                     </FormControl>
-                                    
+
                                     {!this.state.sponsorCodeValid ? <HelpBlock>Sponsor Code is required.</HelpBlock> : null}
                                 </Col>
 

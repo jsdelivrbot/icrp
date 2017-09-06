@@ -7,12 +7,13 @@ git clone https://github.com/CBIIT/icrp.git
 timestamp() {
   date +"%T"
 }
-if [ "$5" = "" ]
+if [ "$1" = "" ]
 then
   echo "**"
-  echo "* Syntax: $0 <DOC_ROOT> <DB_NAME> <DB_USER> <DB_PASSWORD> <SETTINGS_PHP_PATH>"
-  echo "* Enter the document root, db name, db user, and db password"
-  echo "* Enter the FULL path to the settings.php file to replace after the build"
+  echo "* Syntax: $0 <DOC_ROOT>"
+  # <DB_NAME> <DB_USER> <DB_PASSWORD> <SETTINGS_PHP_PATH>"
+  #echo "* Enter the document root, db name, db user, and db password"
+  #echo "* Enter the FULL path to the settings.php file to replace after the build"
   echo "**"
   exit
 fi
@@ -44,7 +45,10 @@ echo "**"
 echo "* Remove all files from $DOC_ROOT"
 echo "**"
 echo "mkdir -p $DOC_ROOT"
-rm -rf $DOC_ROOT
+rm -rf $DOC_ROOT/.git
+rm -rf $DOC_ROOT/.gitignore
+rm -rf $DOC_ROOT/*
+
 mkdir -p $DOC_ROOT
 
 echo "**"
@@ -67,7 +71,7 @@ cd $DOC_ROOT
 echo "**"
 echo "* Copy composer.json.8.2.7 and run composer update "
 echo "**"
-cp ../icrp/utility/upgrade_production_8.3.7/composer/composer.json.8.2.7 ./composer.json
+cp ../tmp/utility/upgrade_production_8.3.7/composer/composer.json.8.2.7 ./composer.json
 
 echo "You should have your composer.json"
 
@@ -82,41 +86,35 @@ echo "**"
 echo "* The next command may need your github username and password"
 echo "* git clone https://<username>:<password>@github.com/CBIIT/icrp.git\n**"
 echo "**"
-cd sites
-git clone https://github.com/CBIIT/icrp.git
+#cd sites
+#git clone https://github.com/CBIIT/icrp.git
 #git clone https://<username>:<password>@github.com/CBIIT/icrp.git
 
-cd icrp
-echo "**"
-echo "* Switching to 1.2"
-echo "**"
-git checkout tags/icrp_1.2.0_20170718
+#cd icrp
+#echo "**"
+#echo "* Switching to 1.2"
+#echo "**"
+#git checkout tags/icrp_1.2.0_20170718
 
 #cp modules, themes, libraries, and default directories
 echo "**"
 echo "* Copy themes and libraries"
 echo "**"
-cp -r modules/* ../../modules
-cp -r themes/* ../../themes
-mkdir -p ../../libraries
-cp -r libraries/* ../../libraries
-cp -r sites/default/ ../default/
-
-#cp settings.php to the new site.
-echo "**"
-echo "* Copy themes and libraries"
-echo "**"
-echo "cp $SETTINGS_PHP_PATH/settings.php ../default/"
-cp $SETTINGS_PHP_PATH/settings.php ../default/
-
+#cp -r modules/* ../../modules
+#cp -r themes/* ../../themes
+#mkdir -p ../../libraries
+#cp -r libraries/* ../../libraries
+#cp -r sites/default/ ../default/
+#cp -rf /local/drupal/icrp-old/sites/default/files /local/drupal/$DOC_ROOT/sites/default/
 #import database to icrp
 echo "**"
 echo "* Import database"
 echo "**"
-mysqladmin -u$DB_USER -p$DB_PASS -f drop $DB_NAME
-mysqladmin -u$DB_USER -p$DB_PASS create $DB_NAME
-mysql -u$DB_USER -p$DB_PASS $DB_NAME < icrp.sql
-drush cr
+#mysqladmin -u$DB_USER -p$DB_PASS -f drop $DB_NAME
+#mysqladmin -u$DB_USER -p$DB_PASS create $DB_NAME
+#mysql -u$DB_USER -p$DB_PASS $DB_NAME < icrp.sql
+#drush cr
+
 echo "**"
 echo "* ICRP 1.2 is ready"
 echo "**"

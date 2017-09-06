@@ -7,6 +7,7 @@ import UploadFormComponent from './components/UploadFormComponent';
 import NavigationComponent from './components/NavigationComponent';
 import ValidationConfiguratorComponent from './components/ValidationConfiguratorComponent';
 import ValidationSummaryComponent from './components/ValidationSummaryComponent';
+import ImportPage from './components/ImportPage';
 import NewTableComponent from './components/NewTableComponent';
 import Spinner from './components/SpinnerComponent';
 
@@ -31,13 +32,14 @@ class App extends Component {
       sortDirection: 'ASC',
       validationResults: [],
       validationRules: [],
-      uploadType: 'new',
+      uploadType: 'New',
       sponsorCode: '',
+      receivedDate: null,
       openSummary: false,
       openDetails: false,
       openSummaryDisabled: true,
       openDetailsDisabled: true,
-      
+
       exportDisabled: true,
       fileName: '',
       loadingExport: false,
@@ -68,8 +70,9 @@ class App extends Component {
       sortDirection: 'ASC',
       validationResults: [],
       validationRules: [],
-      uploadType: 'new',
+      uploadType: 'New',
       sponsorCode: '',
+      receivedDate: null,
       openSummary: false,
       openDetails: false,
       openSummaryDisabled: true,
@@ -80,8 +83,18 @@ class App extends Component {
     })
   }
 
-  handleFileUpload(stats, columns, projects, sponsorCode, uploadType, fileName) {
-    this.setState({ stats: stats, columns: columns, projects: projects, showDataTable: true, tab2Disabled: false, sponsorCode: sponsorCode, uploadType: uploadType, fileName: fileName });
+  handleFileUpload(stats, columns, projects, sponsorCode, uploadType, fileName, receivedDate) {
+    this.setState({
+      stats: stats,
+      columns: columns,
+      projects: projects,
+      showDataTable: true,
+      tab2Disabled: false,
+      sponsorCode: sponsorCode,
+      uploadType: uploadType,
+      receivedDate: receivedDate,
+      fileName: fileName
+    });
   }
 
   handleLoadingStateChange() {
@@ -128,14 +141,14 @@ class App extends Component {
     this.setState({ tabKey: key });
   }
 
-  async handleExport() {
+  async handleExport(failedRules) {
 
     this.setState({
       loadingExport: true,
     })
 
     let parameters = {
-      excludedRules: this.state.validationRules.filter(rule => !rule.checked || !rule.active).map(rule => rule.id).join(','),
+      exportRules: JSON.stringify(failedRules),
       originalFileName: this.state.fileName,
       uploadType: this.state.uploadType,
       partnerCode: this.state.sponsorCode,
@@ -177,38 +190,38 @@ class App extends Component {
         <Tabs activeKey={this.state.tabKey} onSelect={this.handleTabSelect} id="uncontrolled-tabs">
           <Tab eventKey={1} title="Load Workbook">
             <div className="tab-container">
-              <UploadFormComponent 
-                onFileUploadSuccess={this.handleFileUpload} 
-                onLoadingStart={this.handleLoadingStateChange} 
+              <UploadFormComponent
+                onFileUploadSuccess={this.handleFileUpload}
+                onLoadingStart={this.handleLoadingStateChange}
                 onReset={this.reset} />
-              
-              <NewTableComponent 
-                visible={this.state.showDataTable} 
-                stats={this.state.stats} 
+
+              <NewTableComponent
+                visible={this.state.showDataTable}
+                stats={this.state.stats}
                 page={this.state.page}
-                sortColumn={this.state.sortColumn} 
+                sortColumn={this.state.sortColumn}
                 sortDirection={this.state.sortDirection}
-                columns={this.state.columns} 
-                projects={this.state.projects} 
+                columns={this.state.columns}
+                projects={this.state.projects}
                 onChange={this.handleDataTableChange} />
 
-              <NavigationComponent 
-                hasBackButton={false} 
-                hasNextButton={true} 
-                nextDisabled={this.state.tab2Disabled} 
-                clickHandler={this.handleTabSelect} 
-                thisTabId={1} 
+              <NavigationComponent
+                hasBackButton={false}
+                hasNextButton={true}
+                nextDisabled={this.state.tab2Disabled}
+                clickHandler={this.handleTabSelect}
+                thisTabId={1}
                 cancelUrl={homeLocation} />
 
             </div>
           </Tab>
           <Tab eventKey={2} title="Data Integrity Check" disabled={this.state.tab2Disabled} >
             <div className="tab-container">
-              <ValidationConfiguratorComponent 
-                onValidationResults={this.handleValidationResults} 
-                onLoadingStart={this.handleLoadingStateChange} 
-                uploadType={this.state.uploadType} 
-                sponsorCode={this.state.sponsorCode} 
+              <ValidationConfiguratorComponent
+                onValidationResults={this.handleValidationResults}
+                onLoadingStart={this.handleLoadingStateChange}
+                uploadType={this.state.uploadType}
+                sponsorCode={this.state.sponsorCode}
               />
 
               <ValidationSummaryComponent
@@ -221,22 +234,22 @@ class App extends Component {
                 openDetailsDisabled={this.state.openDetailsDisabled}
 
                 summaryToggleHandler={this.handleSummaryCollapseToggle}
-                detailsToggleHandler={this.handleDetailsCollapseToggle} 
+                detailsToggleHandler={this.handleDetailsCollapseToggle}
 
                 exportDisabled={this.state.exportDisabled}
-                onExport={this.handleExport}  
+                onExport={this.handleExport}
                 loadingExport={this.state.loadingExport}
-                
-                
-                
+
+
+
                 />
 
-              <NavigationComponent 
-                hasBackButton={true} 
-                hasNextButton={true} 
-                nextDisabled={this.state.tab3Disabled} 
-                clickHandler={this.handleTabSelect} 
-                thisTabId={2} 
+              <NavigationComponent
+                hasBackButton={true}
+                hasNextButton={true}
+                nextDisabled={this.state.tab3Disabled}
+                clickHandler={this.handleTabSelect}
+                thisTabId={2}
                 cancelUrl={homeLocation} />
 
             </div>
@@ -244,6 +257,14 @@ class App extends Component {
 
           <Tab eventKey={3} title="Import" disabled={this.state.tab3Disabled}>
             <div className="tab-container">
+
+              <ImportPage
+                type={this.state.uploadType}
+                partnerCode={this.state.sponsorCode}
+                receivedDate={this.state.receivedDate}
+                onNavigation={key => this.setState({ tabKey: key })}
+                cancelUrl={homeLocation}
+              />
 
             </div>
           </Tab>

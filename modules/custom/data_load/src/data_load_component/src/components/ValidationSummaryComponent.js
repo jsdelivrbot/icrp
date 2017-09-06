@@ -82,6 +82,18 @@ class ValidationSummaryComponent extends Component {
             }
         });
 
+        let failedRules = this.props.validationResults
+            .filter(result => parseInt(result.id) !== 0)
+            .filter(result => result.validationResult === 'Failed')
+            .filter(result => {
+                const rule = validationRules.find(rule => rule.id === +result.id);
+                return rule.checked && rule.active;
+            })
+            .map(result => ({
+                id: parseInt(result.id),
+                name: result.name
+            }));
+
         return (
 
             <div>
@@ -107,15 +119,15 @@ class ValidationSummaryComponent extends Component {
                     isOpen={this.props.openDetails}
                     isActive={!this.props.openDetailsDisabled}
                 />
-               
+
                 <Collapse in={this.props.openDetails}>
                     <div className="validation-summary-panel" style={{position: 'relative'}}>
-                        <Button 
+                        <Button
                             className="responsive-pull-right"
-                            onClick={this.props.onExport} 
+                            onClick={event => this.props.onExport(failedRules)}
                             disabled={this.props.exportDisabled}>
                             Export Error Records
-                        </Button>                 
+                        </Button>
                         <ListGroup style={{position: 'relative'}}>
                             {validationResults}
                         </ListGroup>
