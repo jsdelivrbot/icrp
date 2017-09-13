@@ -31,7 +31,7 @@ class PDOBuilder {
     $cfg = Drupal::config($database)->get();
 
     return new PDO(
-      vsprintf('%s:Server=%s,%s;Database=%s', [
+      vsprintf('%s:host=%s;port=%s;dbname=%s;charset=utf8', [
         $cfg['driver'],
         $cfg['host'],
         $cfg['port'],
@@ -40,7 +40,6 @@ class PDOBuilder {
       $cfg['username'],
       $cfg['password'],
       [
-        PDO::SQLSRV_ATTR_ENCODING    => PDO::SQLSRV_ENCODING_UTF8,
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
 //      PDO::ATTR_ERRMODE            => PDO::ERRMODE_SILENT,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

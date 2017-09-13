@@ -154,15 +154,12 @@ SELECT
 FROM `Partner`
 ORDER BY `Country`, `Name`//
 
-
 /*****************************************************************************************/
 -- PROCEDURE `GetFundingOrgs`()
 /*****************************************************************************************/
 DROP PROCEDURE IF EXISTS `GetFundingOrgs`//
 
-CREATE PROCEDURE `GetFundingOrgs`(
-  IN `@type` VARCHAR(15)
-)
+CREATE PROCEDURE `GetFundingOrgs`()
 LANGUAGE SQL
 NOT DETERMINISTIC
 CONTAINS SQL
@@ -184,7 +181,28 @@ SELECT
   `LastImportDate`,
   `LastImportDesc`
 FROM `FundingOrg`
-WHERE `MemberStatus` = 'Current' AND (`@type` = 'funding' OR (`@type` = 'Search' AND `LastImportDate` IS NOT NULL))
+WHERE `MemberStatus` = 'Current'
+ORDER BY `SponsorCode`, `Name`//
+
+/*****************************************************************************************/
+-- PROCEDURE `GetFundingOrgsSearch`()
+/*****************************************************************************************/
+DROP PROCEDURE IF EXISTS `GetFundingOrgsSearch`//
+
+CREATE PROCEDURE `GetFundingOrgsSearch` ()
+LANGUAGE SQL
+NOT DETERMINISTIC
+CONTAINS SQL
+SQL SECURITY DEFINER
+COMMENT ''
+SELECT
+  `FundingOrgID` AS value,
+  `Name` AS label,
+  `SponsorCode` AS group_1,
+  `Country` AS group_2,
+  'Funding' AS group_3
+FROM `FundingOrg`
+WHERE `MemberStatus` = 'Current' AND `LastImportDate` IS NOT NULL
 ORDER BY `SponsorCode`, `Name`//
 
 /*****************************************************************************************/

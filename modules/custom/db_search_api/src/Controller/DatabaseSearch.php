@@ -60,36 +60,16 @@ class DatabaseSearch {
     $fields = [];
     $queries = [
       'years'                       => 'SELECT MIN(CalendarYear) AS min_year, MAX(CalendarYear) AS max_year FROM ProjectFundingExt',
-      'countries'                   => 'SELECT Abbreviation AS [value], Name AS [label] FROM Country ORDER BY [label]',
-      'states'                      => 'SELECT Abbreviation AS [value], Name AS [label], Country AS [group_1] FROM State ORDER BY [label]',
-      'cities'                      => 'SELECT DISTINCT City AS [value], City AS [label], State AS [group_1], Country AS [group_2] FROM Institution WHERE len(City) > 0 ORDER BY [label]',
-      'funding_organization_types'  => 'SELECT FundingOrgType AS [value], FundingOrgType AS [label] FROM lu_FundingOrgType',
-      'cancer_types'                => 'SELECT CancerTypeID AS [value], Name AS [label] FROM CancerType ORDER BY [label]',
-      'project_types'               => 'SELECT ProjectType AS [value], ProjectType AS [label] FROM ProjectType',
-      'cso_research_areas'          => 'SELECT Code AS [value], Code + \' \' + Name AS [label], CategoryName AS [group_1], \'All Areas\' as [group_2] FROM CSO ORDER BY sortOrder, value',
-      'conversion_years'            => 'SELECT DISTINCT Year AS [value], Year AS [label] FROM CurrencyRate ORDER BY Year DESC',
-//    'funding_organizations'       => 'SELECT FundingOrgID AS [value], Name AS [label], SponsorCode AS [group_1], Country AS [group_2], \'Funding\' AS [group_3] FROM FundingOrg WHERE LastImportDate IS NOT NULL',
-      'funding_organizations'       => '
-        SET NOCOUNT ON; 
-        CREATE TABLE TEMPORARY_FUNDING_ORGANIZATIONS (
-          FundingOrgID int,
-          Name varchar(100),
-          Abbreviation varchar(15),
-          DisplayName varchar(153),
-          Type varchar(25),
-          MemberType varchar(25),
-          MemberStatus nchar(10),
-          Country varchar(3),
-          Currency varchar(3),
-          SponsorCode varchar(50),
-          IsAnnualized bit,
-          Note varchar(8000),
-          LastImportDate datetime,
-          LastImportDesc varchar(1000),
-        );
-        INSERT INTO TEMPORARY_FUNDING_ORGANIZATIONS EXECUTE GetFundingOrgs @type = search;
-        SELECT FundingOrgID AS [value], Name AS [label], SponsorCode AS [group_1], Country AS [group_2], \'Funding\' AS [group_3] FROM TEMPORARY_FUNDING_ORGANIZATIONS;
-        DROP TABLE TEMPORARY_FUNDING_ORGANIZATIONS;',
+      'countries'                   => 'SELECT Abbreviation AS value, Name AS label FROM Country ORDER BY label',
+      'states'                      => 'SELECT Abbreviation AS value, Name AS label, Country AS group_1 FROM State ORDER BY label',
+      'cities'                      => 'SELECT DISTINCT City AS value, City AS label, State AS group_1, Country AS group_2 FROM Institution WHERE LENGTH(City) > 0 ORDER BY label',
+      'funding_organization_types'  => 'SELECT FundingOrgType AS value, FundingOrgType AS label FROM lu_FundingOrgType',
+      'cancer_types'                => 'SELECT CancerTypeID AS value, Name AS label FROM CancerType ORDER BY label',
+      'project_types'               => 'SELECT ProjectType AS value, ProjectType AS label FROM ProjectType',
+      'cso_research_areas'          => 'SELECT Code AS value, Code + \' \' + Name AS label, CategoryName AS group_1, \'All Areas\' as group_2 FROM CSO ORDER BY sortOrder, value',
+      'conversion_years'            => 'SELECT DISTINCT Year AS value, Year AS label FROM CurrencyRate ORDER BY Year DESC',
+//    'funding_organizations'       => 'SELECT FundingOrgID AS value, Name AS label, SponsorCode AS group_1, Country AS group_2, \'Funding\' AS group_3 FROM FundingOrg WHERE LastImportDate IS NOT NULL',
+      'funding_organizations'       => 'CALL GetFundingOrgsSearch();',
     ];
 
     // map query results to field values
@@ -374,9 +354,8 @@ class DatabaseSearch {
       ],
     ];
 
-    $query_defaults = 'SET NOCOUNT ON; ';
-    $query_string = '
-      EXECUTE GetProjectsByCriteria
+    /*$query_string = '
+      CALL GetProjectsByCriteria
         @PageSize             = :page_size,
         @PageNumber           = :page_number,
         @SortCol              = :sort_column,
@@ -403,11 +382,11 @@ class DatabaseSearch {
 
     $stmt = PDOBuilder::createPreparedStatement(
       $pdo,
-      $query_defaults . $query_string,
+      $query_string,
       $parameters,
       $output_parameters);
-
-    $results = [];
+    */
+    $results = [];/*
     if ($stmt->execute()) {
       while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $results[] = [
@@ -423,11 +402,11 @@ class DatabaseSearch {
     }
 
     $search_id = $output_parameters['search_id']['value'];
-
+*/
     return [
       'search_id'           => $search_id,
       'results'             => $results,
-      'search_parameters'   => self::getSearchParametersAsTable($pdo, ['search_id' => $search_id]),
+      'search_parameters'   => NULL//self::getSearchParametersAsTable($pdo, ['search_id' => $search_id]),
     ];
   }
 
@@ -490,12 +469,9 @@ class DatabaseSearch {
    */
   public static function getSearchSummary(PDO $pdo, array $parameters = ['search_id' => -1]): array {
 
-    $query_defaults = 'SET NOCOUNT ON; ';
     $stmt = PDOBuilder::createPreparedStatement(
       $pdo,
-      $query_defaults .
-      'EXECUTE GetProjectSearchSummaryBySearchID
-        @SearchID = :search_id',
+      'SELECT ResultCount AS TotalProjectCount, TotalRelatedProjectCount, LastBudgetYear FROM SearchResult WHERE SearchCriteriaID = :search_id',
       $parameters);
 
     if ($stmt->execute()) {
