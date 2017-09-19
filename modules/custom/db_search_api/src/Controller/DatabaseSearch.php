@@ -8,6 +8,7 @@ namespace Drupal\db_search_api\Controller;
 
 use PDO;
 use PDOStatement;
+use Elasticsearch\ClientBuilder;
 
 /**
  * Static functions for db_search_api routes.
@@ -345,7 +346,6 @@ class DatabaseSearch {
   * @api
   */
   public static function getSearchResults(PDO $pdo, array $parameters): array {
-
     $parameters['sort_column'] = self::SORT_COLUMN_MAP[$parameters['sort_column']];
     $output_parameters = [
       'search_id' => [
@@ -353,6 +353,38 @@ class DatabaseSearch {
         'type'  => PDO::PARAM_INT,
       ],
     ];
+    $hosts = ['#'];
+    $client = ClientBuilder::create()->setHosts($hosts)->build();
+    $response = $client->search([
+      'scroll'=>'30s',
+      'size'=>1000,
+      'index'=>'project_criteria',
+      'type'=>'data',
+      'body'=>[
+        'query'=>[
+          'bool'=>['must_not'=>['exists'=>['field'=>['projectcontent']]]]
+        ],
+        'fields'=>['_id']
+      ]
+    ]);
+    $results=array_map(
+      function($value) {
+        return $value['_id'];
+      },
+      $response['hits']['hits']
+    );
+    while (isset($response['hits']['hits']) && count($response['hits']['hits']) > 0) {
+      $response = $client->scroll([
+          'scroll_id'=>$response['_scroll_id'],
+          'scroll'=>'30s'
+        ])['hits']['hits'];
+      $results = array_merge($results,array_map(
+        function($value) {
+          return $value['_id'];
+        },
+        $response
+      ));
+    }
 
     /*$query_string = '
       CALL GetProjectsByCriteria
@@ -386,7 +418,7 @@ class DatabaseSearch {
       $parameters,
       $output_parameters);
     */
-    $results = [];/*
+    /*
     if ($stmt->execute()) {
       while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $results[] = [
