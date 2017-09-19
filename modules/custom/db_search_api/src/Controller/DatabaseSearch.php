@@ -355,6 +355,68 @@ class DatabaseSearch {
     ];
     $hosts = ['#'];
     $client = ClientBuilder::create()->setHosts($hosts)->build();
+    $body = [];
+    if (array_key_exists('search_terms',$parameters) && !is_null($parameters['search_terms'])) {
+      return(['search_terms found']);
+    }
+    if (array_key_exists('search_type',$parameters) && !is_null($parameters['search_type'])) {
+      return(['search_type found']);
+    }
+    if (array_key_exists('years',$parameters) && !is_null($parameters['years'])) {
+      $body[] = [
+        'bool'=>[
+          'should'=>array_map(
+            function($value) {
+              return ['term'=>['projectfundings.calendaryears'=>$value]];
+            },
+            explode(",",$parameters['years'])
+          ),
+          'minimum_should_match'=>1
+        ]
+      ];
+    }
+    if (array_key_exists('institution',$parameters) && !is_null($parameters['institution'])) {
+      return(['institution found']);
+    }
+    if (array_key_exists('pi_first_name',$parameters) && !is_null($parameters['pi_first_name'])) {
+      return(['pi_first_name found']);
+    }
+    if (array_key_exists('pi_last_name',$parameters) && !is_null($parameters['pi_last_name'])) {
+      return(['pi_last_name found']);
+    }
+    if (array_key_exists('pi_orcid',$parameters) && !is_null($parameters['pi_orcid'])) {
+      return(['pi_orcid found']);
+    }
+    if (array_key_exists('award_code',$parameters) && !is_null($parameters['award_code'])) {
+      return(['award_code found']);
+    }
+    if (array_key_exists('countries',$parameters) && !is_null($parameters['countries'])) {
+      return(['countries found']);
+    }
+    if (array_key_exists('states',$parameters) && !is_null($parameters['states'])) {
+      return(['states found']);
+    }
+    if (array_key_exists('cities',$parameters) && !is_null($parameters['cities'])) {
+      return(['cities found']);
+    }
+    if (array_key_exists('funding_organization_types',$parameters) && !is_null($parameters['funding_organization_types'])) {
+      return(['funding_organization_types found']);
+    }
+    if (array_key_exists('funding_organizations',$parameters) && !is_null($parameters['funding_organizations'])) {
+      return(['funding_organizations found']);
+    }
+    if (array_key_exists('cancer_types',$parameters) && !is_null($parameters['cancer_types'])) {
+      return(['cancer_types found']);
+    }
+    if (array_key_exists('project_types',$parameters) && !is_null($parameters['project_types'])) {
+      return(['project_types found']);
+    }
+    if (array_key_exists('is_childhood_cancer',$parameters) && !is_null($parameters['is_childhood_cancer'])) {
+      return(['is_childhood_cancer found']);
+    }
+    if (array_key_exists('cso_research_areas',$parameters) && !is_null($parameters['cso_research_areas'])) {
+      return(['cso_research_areas found']);
+    }
     $response = $client->search([
       'scroll'=>'30s',
       'size'=>1000,
@@ -362,11 +424,14 @@ class DatabaseSearch {
       'type'=>'data',
       'body'=>[
         'query'=>[
-          'bool'=>['must_not'=>['exists'=>['field'=>['projectcontent']]]]
+          'bool'=>[
+            'must'=>$body
+          ]
         ],
-        'fields'=>['_id']
+        'fields'=>[]
       ]
     ]);
+    return($response);
     $results=array_map(
       function($value) {
         return $value['_id'];
@@ -385,7 +450,6 @@ class DatabaseSearch {
         $response
       ));
     }
-
     /*$query_string = '
       CALL GetProjectsByCriteria
         @PageSize             = :page_size,
@@ -411,7 +475,8 @@ class DatabaseSearch {
         @CSOList              = :cso_research_areas,
         @searchCriteriaID     = :search_id,
         @ResultCount          = NULL';
-
+    */
+    /*
     $stmt = PDOBuilder::createPreparedStatement(
       $pdo,
       $query_string,
@@ -434,7 +499,7 @@ class DatabaseSearch {
     }
 
     $search_id = $output_parameters['search_id']['value'];
-*/
+    */
     return [
       'search_id'           => $search_id,
       'results'             => $results,
