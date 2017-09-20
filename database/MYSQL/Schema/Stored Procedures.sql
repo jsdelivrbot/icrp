@@ -21,7 +21,7 @@ BEGIN
 		VALUE INT
 	);
 	
-	-- SET group_concat_max_len=100000 
+  SET SESSION group_concat_max_len = 18446744073709551615;
 	IF `@input` IS NOT NULL THEN
 	
 	drop temporary table if exists temp;
@@ -62,7 +62,7 @@ BEGIN
 		VALUE VARCHAR(50)
 	);
     
-    -- SET group_concat_max_len=100000 
+  SET SESSION group_concat_max_len = 18446744073709551615;
 	IF `@input` IS NOT NULL THEN
 	
 	drop temporary table if exists temp;
@@ -1696,8 +1696,8 @@ CREATE PROCEDURE `StoreSearchResults` (
   IN `@projectTypeList` VARCHAR(1000),
   IN `@CSOList` VARCHAR(1000),
   IN `@IsChildhood` INT(0),  
-  IN `@ResultCount` INT,  -- return the searchID  
-  OUT `@SearchCriteriaID` INT  -- return the searchID  
+  IN `@ResultCount` INT,
+  OUT `@SearchCriteriaID` INT
 )
 LANGUAGE SQL
 NOT DETERMINISTIC
