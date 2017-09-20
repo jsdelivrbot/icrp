@@ -619,7 +619,7 @@ CREATE TABLE IF NOT EXISTS `SearchResult` (
   `ResultCount` int(11) DEFAULT NULL,
 	`TotalRelatedProjectCount` int(11) DEFAULT NULL,
 	`LastBudgetYear` year DEFAULT NULL,
-  `IsEmailSent` tinyint(4) DEFAULT NULL,
+  `IsEmailSent` tinyint(4) DEFAULT 0,
   PRIMARY KEY (`SearchCriteriaID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=ucs2;
 

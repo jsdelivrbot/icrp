@@ -6,6 +6,7 @@
  */
 namespace Drupal\db_search_api\Controller;
 
+use Drupal;
 use PDO;
 use PDOStatement;
 use Elasticsearch\ClientBuilder;
@@ -157,12 +158,9 @@ class DatabaseSearch {
    */
   public static function getSearchParametersAsTable(PDO $pdo, array $parameters = ['search_id' => -1]): array {
 
-    $query_defaults = 'SET NOCOUNT ON; ';
     $stmt = PDOBuilder::createPreparedStatement(
       $pdo,
-      $query_defaults .
-      'EXECUTE GetSearchCriteriaBySearchID
-        @SearchID=:search_id',
+      'CALL GetSearchCriteriaBySearchID(:search_id)',
       $parameters
     );
 
@@ -189,17 +187,17 @@ class DatabaseSearch {
 
     // define queries to be performed for each type
     $queries = [
-      'project_counts_by_country'                     => 'EXECUTE GetProjectCountryStatsBySearchID      @SearchID = :search_id, @Year = :year, @ResultCount = :results_count, @ResultAmount = :results_amount, @Type = Count',
-      'project_counts_by_cso_research_area'           => 'EXECUTE GetProjectCSOStatsBySearchID          @SearchID = :search_id, @Year = :year, @ResultCount = :results_count, @ResultAmount = :results_amount, @Type = Count',
-      'project_counts_by_cancer_type'                 => 'EXECUTE GetProjectCancerTypeStatsBySearchID   @SearchID = :search_id, @Year = :year, @ResultCount = :results_count, @ResultAmount = :results_amount, @Type = Count',
-      'project_counts_by_type'                        => 'EXECUTE GetProjectTypeStatsBySearchID         @SearchID = :search_id, @Year = :year, @ResultCount = :results_count, @ResultAmount = :results_amount, @Type = Count',
-      'project_counts_by_year'                        => 'EXECUTE GetProjectAwardStatsBySearchID        @SearchID = :search_id, @Year = :year, @ResultCount = :results_count, @ResultAmount = :results_amount',
+      'project_counts_by_country'                     => 'CALL GetProjectCountryStatsBySearchID(:search_id,:year,\'Count\',@results_count,@results_amount)',
+      'project_counts_by_cso_research_area'           => 'CALL GetProjectCSOStatsBySearchID(:search_id,:year,\'Count\',@results_count,@results_amount)',
+      'project_counts_by_cancer_type'                 => 'CALL GetProjectCancerTypeStatsBySearchID(:search_id,:year,\'Count\',@results_count,@results_amount)',
+      'project_counts_by_type'                        => 'CALL GetProjectTypeStatsBySearchID(:search_id,:year,\'Count\',@results_count,@results_amount)',
+      'project_counts_by_year'                        => 'CALL GetProjectAwardStatsBySearchID(:search_id,:year,@results_count,@results_amount)',
 
-      'project_funding_amounts_by_country'            => 'EXECUTE GetProjectCountryStatsBySearchID      @SearchID = :search_id, @Year = :year, @ResultCount = :results_count, @ResultAmount = :results_amount, @Type = Amount',
-      'project_funding_amounts_by_cso_research_area'  => 'EXECUTE GetProjectCSOStatsBySearchID          @SearchID = :search_id, @Year = :year, @ResultCount = :results_count, @ResultAmount = :results_amount, @Type = Amount',
-      'project_funding_amounts_by_cancer_type'        => 'EXECUTE GetProjectCancerTypeStatsBySearchID   @SearchID = :search_id, @Year = :year, @ResultCount = :results_count, @ResultAmount = :results_amount, @Type = Amount',
-      'project_funding_amounts_by_type'               => 'EXECUTE GetProjectTypeStatsBySearchID         @SearchID = :search_id, @Year = :year, @ResultCount = :results_count, @ResultAmount = :results_amount, @Type = Amount',
-      'project_funding_amounts_by_year'               => 'EXECUTE GetProjectAwardStatsBySearchID        @SearchID = :search_id, @Year = :year, @ResultCount = :results_count, @ResultAmount = :results_amount',
+      'project_funding_amounts_by_country'            => 'CALL GetProjectCountryStatsBySearchID(:search_id,:year,\'Amount\',@results_count,@results_amount)',
+      'project_funding_amounts_by_cso_research_area'  => 'CALL GetProjectCSOStatsBySearchID(:search_id,:year,\'Amount\',@results_count,@results_amount)',
+      'project_funding_amounts_by_cancer_type'        => 'CALL GetProjectCancerTypeStatsBySearchID(:search_id,:year,\'Amount\',@results_count,@results_amount)',
+      'project_funding_amounts_by_type'               => 'CALL GetProjectTypeStatsBySearchID(:search_id,:year,\'Amount\',@results_count,@results_amount)',
+      'project_funding_amounts_by_year'               => 'CALL GetProjectAwardStatsBySearchID(:search_id,:year,@results_count,@results_amount)',
     ];
 
     // define which columns to retrieve from the query results
@@ -294,20 +292,18 @@ class DatabaseSearch {
       ],
     ];
 
-    $query_defaults = 'SET NOCOUNT ON; ';
     $stmt = PDOBuilder::createPreparedStatement(
       $pdo,
-      $query_defaults . $queries[$type],
-      $parameters,
-      $output_parameters
+      $queries[$type],
+      $parameters
     );
 
     // execute statement and update output object
     $results = [];
     if ($stmt->execute()) {
       while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-
         $column_map = $column_maps[$type];
+        #return([$column_map,$row]);
         $item = [
           'label' => $row[$column_map['label']],
           'data' => [],
@@ -353,85 +349,182 @@ class DatabaseSearch {
         'type'  => PDO::PARAM_INT,
       ],
     ];
-    $hosts = ['#'];
+    $cfg = Drupal::config('icrp_elasticsearch')->get();
+    $hosts = [
+      $cfg['protocol']."://".$cfg['host'].":".$cfg['port']
+    ];
     $client = ClientBuilder::create()->setHosts($hosts)->build();
     $body = [];
     if (array_key_exists('search_terms',$parameters) && !is_null($parameters['search_terms'])) {
-      return(['search_terms found']);
-    }
-    if (array_key_exists('search_type',$parameters) && !is_null($parameters['search_type'])) {
-      return(['search_type found']);
+      if (!array_key_exists('search_type',$parameters) || is_null($parameters['search_type'])) {
+        $parameters['search_type'] = 'all';
+      }
+      $termsearch = [
+        ($parameters['search_type']=='exact'?'match_phrase':'match')=>[
+          'projectcontent'=>[
+            'query'=>trim($parameters['search_terms']),
+            'operator'=>($parameters['search_type']=='all'?'and':'or')
+          ]
+        ]
+      ];
+      if ($parameters['search_type']=='none') {
+        $termsearch = [
+          'bool'=>[
+            'must_not'=>$termsearch
+          ]
+        ];
+      }
+      $body[] = $termsearch;
     }
     if (array_key_exists('years',$parameters) && !is_null($parameters['years'])) {
+      $body[] = [
+        'terms'=>[
+          'projectfundings.calendaryears'=>explode(",",$parameters['years'])
+        ]
+      ];
+    }
+    if (array_key_exists('institution',$parameters) && !is_null($parameters['institution'])) {
+      $body[] = [
+        'common'=>[
+          'projectfundings.institution'=>$parameters['institution']
+        ]
+      ];
+    }
+    if (array_key_exists('pi_first_name',$parameters) && !is_null($parameters['pi_first_name'])) {
+      $body[]=[
+        'match_phrase'=>[
+          'projectfundings.pifirstname'=>$parameters['pi_first_name']
+        ]
+      ];
+    }
+    if (array_key_exists('pi_last_name',$parameters) && !is_null($parameters['pi_last_name'])) {
+      $body[]=[
+        'match_phrase'=>[
+          'projectfundings.pilastname'=>$parameters['pi_last_name']
+        ]
+      ];
+    }
+    if (array_key_exists('pi_orcid',$parameters) && !is_null($parameters['pi_orcid'])) {
+      $body[]=[
+        'match_phrase'=>[
+          'projectfundings.piorcid'=>$parameters['pi_orcid']
+        ]
+      ];
+    }
+    if (array_key_exists('award_code',$parameters) && !is_null($parameters['award_code'])) {
+      $body[]=[
+        'match_phrase'=>[
+          'awardcode'=>$parameters['award_code']
+        ]
+      ];
+    }
+    if (array_key_exists('countries',$parameters) && !is_null($parameters['countries'])) {
+      $body[] = [
+        'match'=>[
+          'projectfundings.country'=>[
+            'query'=>trim($parameters['countries']),
+            'operator'=>'or'
+          ]
+        ]
+      ];
+    }
+    if (array_key_exists('states',$parameters) && !is_null($parameters['states'])) {
+      $body[] = [
+        'match'=>[
+          'projectfundings.state'=>[
+            'query'=>trim($parameters['states']),
+            'operator'=>'or'
+          ]
+        ]
+      ];
+    }
+    if (array_key_exists('cities',$parameters) && !is_null($parameters['cities'])) {
+      $body[] = [
+        'match'=>[
+          'projectfundings.city'=>[
+            'query'=>trim($parameters['cities']),
+            'operator'=>'or'
+          ]
+        ]
+      ];
+    }
+    if (array_key_exists('funding_organization_types',$parameters) && !is_null($parameters['funding_organization_types'])) {
+      $body[] = [
+        'match'=>[
+          'projectfundings.fundingorgtype'=>[
+            'query'=>trim($parameters['funding_organization_types']),
+            'operator'=>'or'
+          ]
+        ]
+      ];
+    }
+    if (array_key_exists('funding_organizations',$parameters) && !is_null($parameters['funding_organizations'])) {
       $body[] = [
         'bool'=>[
           'should'=>array_map(
             function($value) {
-              return ['term'=>['projectfundings.calendaryears'=>$value]];
+              return ['term'=>['projectfundings.fundingorgid'=>$value]];
             },
-            explode(",",$parameters['years'])
+            explode(",",$parameters['funding_organizations'])
           ),
           'minimum_should_match'=>1
         ]
       ];
     }
-    if (array_key_exists('institution',$parameters) && !is_null($parameters['institution'])) {
-      return(['institution found']);
-    }
-    if (array_key_exists('pi_first_name',$parameters) && !is_null($parameters['pi_first_name'])) {
-      return(['pi_first_name found']);
-    }
-    if (array_key_exists('pi_last_name',$parameters) && !is_null($parameters['pi_last_name'])) {
-      return(['pi_last_name found']);
-    }
-    if (array_key_exists('pi_orcid',$parameters) && !is_null($parameters['pi_orcid'])) {
-      return(['pi_orcid found']);
-    }
-    if (array_key_exists('award_code',$parameters) && !is_null($parameters['award_code'])) {
-      return(['award_code found']);
-    }
-    if (array_key_exists('countries',$parameters) && !is_null($parameters['countries'])) {
-      return(['countries found']);
-    }
-    if (array_key_exists('states',$parameters) && !is_null($parameters['states'])) {
-      return(['states found']);
-    }
-    if (array_key_exists('cities',$parameters) && !is_null($parameters['cities'])) {
-      return(['cities found']);
-    }
-    if (array_key_exists('funding_organization_types',$parameters) && !is_null($parameters['funding_organization_types'])) {
-      return(['funding_organization_types found']);
-    }
-    if (array_key_exists('funding_organizations',$parameters) && !is_null($parameters['funding_organizations'])) {
-      return(['funding_organizations found']);
-    }
     if (array_key_exists('cancer_types',$parameters) && !is_null($parameters['cancer_types'])) {
-      return(['cancer_types found']);
+      $body[] = [
+        'bool'=>[
+          'should'=>array_map(
+            function($value) {
+              return ['term'=>['projectfundings.cancertypes'=>$value]];
+            },
+            explode(",",$parameters['cancer_types'])
+          ),
+          'minimum_should_match'=>1
+        ]
+      ];
     }
     if (array_key_exists('project_types',$parameters) && !is_null($parameters['project_types'])) {
-      return(['project_types found']);
+      $body[] = [
+        'bool'=>[
+          'should'=>array_map(
+            function($value) {
+              return ['match_phrase'=>['projecttype'=>trim($value)]];
+            },
+            explode(",",$parameters['project_types'])
+          ),
+          'minimum_should_match'=>1
+        ]
+      ];
     }
     if (array_key_exists('is_childhood_cancer',$parameters) && !is_null($parameters['is_childhood_cancer'])) {
-      return(['is_childhood_cancer found']);
+      $body[]=[
+        'term'=>[
+          'ischildhood'=>$parameters['is_childhood_cancer']
+        ]
+      ];
     }
     if (array_key_exists('cso_research_areas',$parameters) && !is_null($parameters['cso_research_areas'])) {
-      return(['cso_research_areas found']);
+      $body[] = [
+        'terms'=>[
+          'projectfundings.csocodes'=>explode(",",$parameters['cso_research_areas'])
+        ]
+      ];
     }
     $response = $client->search([
-      'scroll'=>'30s',
-      'size'=>1000,
-      'index'=>'project_criteria',
-      'type'=>'data',
+      'scroll'=>$cfg['scroll'],
+      'size'=>$cfg['size'],
+      'index'=>$cfg['index'],
+      'type'=>$cfg['type'],
       'body'=>[
         'query'=>[
           'bool'=>[
             'must'=>$body
           ]
         ],
-        'fields'=>[]
+        'fields'=>['_id']
       ]
     ]);
-    return($response);
     $results=array_map(
       function($value) {
         return $value['_id'];
@@ -442,48 +535,48 @@ class DatabaseSearch {
       $response = $client->scroll([
           'scroll_id'=>$response['_scroll_id'],
           'scroll'=>'30s'
-        ])['hits']['hits'];
+        ]);
       $results = array_merge($results,array_map(
         function($value) {
           return $value['_id'];
         },
-        $response
+        $response['hits']['hits']
       ));
     }
-    /*$query_string = '
-      CALL GetProjectsByCriteria
-        @PageSize             = :page_size,
-        @PageNumber           = :page_number,
-        @SortCol              = :sort_column,
-        @SortDirection        = :sort_direction,
-        @terms                = :search_terms,
-        @termSearchType       = :search_type,
-        @yearList             = :years,
-        @institution          = :institution,
-        @piFirstName          = :pi_first_name,
-        @piLastName           = :pi_last_name,
-        @piORCiD              = :pi_orcid,
-        @awardCode            = :award_code,
-        @countryList          = :countries,
-        @stateList            = :states,
-        @cityList             = :cities,
-        @FundingOrgTypeList   = :funding_organization_types,
-        @fundingOrgList       = :funding_organizations,
-        @cancerTypeList       = :cancer_types,
-        @projectTypeList      = :project_types,
-        @IsChildhood          = :is_childhood_cancer,
-        @CSOList              = :cso_research_areas,
-        @searchCriteriaID     = :search_id,
-        @ResultCount          = NULL';
-    */
-    /*
+    $parameters['result_count'] = count($results);
+    $parameters['project_id_list'] = implode(",",$results);
+    $query_string = 'CALL StoreSearchResults('.
+      ':project_id_list,'.            #@ProjectIDList
+      ':page_size,'.                  #@PageSize
+      ':page_number,'.                #@PageNumber
+      ':sort_column,'.                #@SortCol
+      ':sort_direction,'.             #@SortDirection
+      ':search_type,'.                #@termSearchType
+      ':search_terms,'.               #@terms
+      ':institution,'.                #@institution
+      ':pi_first_name,'.              #@piFirstName
+      ':pi_last_name,'.               #@piLastName
+      ':pi_orcid,'.                   #@piORCiD
+      ':award_code,'.                 #@awardCode
+      ':years,'.                      #@yearList
+      ':cities,'.                     #@cityList
+      ':states,'.                     #@stateList
+      ':countries,'.                  #@countryList
+      ':funding_organization_types,'. #@FundingOrgTypeList
+      ':funding_organizations,'.      #@fundingOrgList
+      ':cancer_types,'.               #@cancerTypeList
+      ':project_types,'.              #@projectTypeList
+      ':cso_research_areas,'.         #@CSOList
+      ':is_childhood_cancer,'.        #@IsChildhood
+      ':result_count,'.               #@ResultCount
+      '@searchid'.                    #@searchCriteriaID
+    ')';
     $stmt = PDOBuilder::createPreparedStatement(
       $pdo,
       $query_string,
-      $parameters,
-      $output_parameters);
-    */
-    /*
+      $parameters
+    );
+    $results = [];
     if ($stmt->execute()) {
       while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $results[] = [
@@ -497,13 +590,15 @@ class DatabaseSearch {
         ];
       }
     }
-
-    $search_id = $output_parameters['search_id']['value'];
-    */
+    $stmt = PDOBuilder::createPreparedStatement($pdo, 'SELECT @searchid;');
+    if ($stmt->execute()) {
+      $row = $stmt->fetch(PDO::FETCH_ASSOC);
+      $search_id = $row['@searchid'];
+    }
     return [
       'search_id'           => $search_id,
       'results'             => $results,
-      'search_parameters'   => NULL//self::getSearchParametersAsTable($pdo, ['search_id' => $search_id]),
+      'search_parameters'   => self::getSearchParametersAsTable($pdo, ['search_id' => $search_id]),
     ];
   }
 
@@ -516,39 +611,29 @@ class DatabaseSearch {
   * @api
   */
   public static function getSortedPaginatedResults(PDO $pdo, array $parameters): array {
-
     $parameters['sort_column'] = self::SORT_COLUMN_MAP[$parameters['sort_column']];
-
-    $query_defaults = 'SET NOCOUNT ON; ';
-    $query_string = '
-      EXECUTE GetProjectsBySearchID
-        @SearchID       = :search_id,
-        @PageSize       = :page_size,
-        @PageNumber     = :page_number,
-        @SortCol        = :sort_column,
-        @SortDirection  = :sort_direction,
-        @ResultCount    = NULL';
+    $query_string = 'CALL GetProjectsBySearchID(:page_size,:page_number,:sort_column,:sort_direction,:search_id,@ResultCount)';
 
     $stmt = PDOBuilder::createPreparedStatement(
       $pdo,
-      $query_defaults . $query_string,
+      $query_string,
       $parameters);
 
     $results = [];
     if ($stmt->execute()) {
       while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        array_push($results, [
-          'project_id'            => $row['ProjectID'],
-          'project_title'         => $row['Title'],
-          'pi_name'               => "$row[piLastName], $row[piFirstName]",
-          'institution'           => $row['institution'],
-          'country'               => $row['country'],
-          'funding_organization'  => $row['FundingOrgShort'],
-          'award_code'            => $row['AwardCode'],
-        ]);
+        $results[] = [
+            'project_id'            => $row['ProjectID'],
+            'project_title'         => $row['Title'],
+            'pi_name'               => "$row[piLastName], $row[piFirstName]",
+            'institution'           => $row['institution'],
+            'country'               => $row['country'],
+            'funding_organization'  => $row['FundingOrgShort'],
+            'award_code'            => $row['AwardCode'],
+        ];
       }
     }
-
+    $stmt->closeCursor();
     $search_id = intval($parameters['search_id']);
     return [
       'search_id'           => $search_id,

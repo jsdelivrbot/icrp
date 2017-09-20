@@ -581,8 +581,8 @@ CONTAINS SQL
 SQL SECURITY DEFINER
 COMMENT ''
 BEGIN
-  DECLARE `@ResultList` LONGTEXT DEFAULT '';
-  SELECT @ResultList := `Results` FROM `SearchResult` WHERE `SearchCriteriaID` = `@SearchID`;
+  DECLARE `@ResultList` LONGTEXT DEFAULT '';  
+  SELECT `Results` INTO @ResultList FROM `SearchResult` WHERE `SearchCriteriaID` = `@SearchID`;
   CALL ToIntTable(@ResultList);
 
   DROP TEMPORARY TABLE IF EXISTS `stats`;
@@ -617,8 +617,9 @@ BEGIN
   ) r
   GROUP BY ProjectType;
 
-  SELECT SUM(`Count`) INTO `@ResultCount` FROM `stats`;
-  SELECT SUM(`USDAmount`) INTO `@ResultAmount` FROM `stats`;
+  SELECT SUM(`Count`), SUM(`USDAmount`)
+  INTO `@ResultCount`, `@ResultAmount`
+  FROM `stats`;
 
   IF `@Type` = 'Amount' THEN
     SELECT * FROM `stats` ORDER BY `USDAmount` Desc;
@@ -652,7 +653,7 @@ BEGIN
   -- Get saved search results by searchID
   -- ---------------------------------------------------
   DECLARE `@ProjectIDs` LONGTEXT DEFAULT CONVERT('' USING ucs2);
-  SELECT @ProjectIDs := `Results` FROM `SearchResult` WHERE `SearchCriteriaID` = `@SearchID`;
+  SELECT `Results` INTO @ProjectIDs FROM `SearchResult` WHERE `SearchCriteriaID` = `@SearchID`;
   CALL ToIntTable(@ProjectIDs);
 
   DROP TEMPORARY TABLE IF EXISTS `stats`;
@@ -725,12 +726,12 @@ BEGIN
   -- Get saved search results by searchID
   -- ---------------------------------------------------
   DECLARE `@ProjectIDs` LONGTEXT DEFAULT CONVERT('' USING ucs2);
-  SELECT @ProjectIDs := `Results` FROM `SearchResult` WHERE `SearchCriteriaID` = `@SearchID`;
+  SELECT `Results` INTO @ProjectIDs FROM `SearchResult` WHERE `SearchCriteriaID` = `@SearchID`;
   CALL ToIntTable(@ProjectIDs);
 
   DROP TEMPORARY TABLE IF EXISTS `stats`;
   CREATE TEMPORARY TABLE IF NOT EXISTS `stats` (
-    `CancerType` VARCHAR(3),
+    `country` VARCHAR(3),
     `Count` INT,
     `USDAmount` DOUBLE
   );
@@ -793,12 +794,12 @@ BEGIN
   -- Get saved search results by searchID
   -- ---------------------------------------------------
   DECLARE `@ProjectIDs` LONGTEXT DEFAULT CONVERT('' USING ucs2);
-  SELECT @ProjectIDs := `Results` FROM `SearchResult` WHERE `SearchCriteriaID` = `@SearchID`;
+  SELECT `Results` INTO @ProjectIDs FROM `SearchResult` WHERE `SearchCriteriaID` = `@SearchID`;
   CALL ToIntTable(@ProjectIDs);
 
   DROP TEMPORARY TABLE IF EXISTS `stats`;
   CREATE TEMPORARY TABLE IF NOT EXISTS `stats` (
-    `CancerType` VARCHAR(100),
+    `categoryName` VARCHAR(100),
     `Relevance` DECIMAL(16,2),
     `USDAmount` DOUBLE,
     `ProjectCount` INT
@@ -863,7 +864,7 @@ BEGIN
   -- Get saved search results by searchID
   -- ---------------------------------------------------
   DECLARE `@ProjectIDs` LONGTEXT DEFAULT CONVERT('' USING ucs2);
-  SELECT @ProjectIDs := `Results` FROM `SearchResult` WHERE `SearchCriteriaID` = `@SearchID`;
+  SELECT `Results` INTO @ProjectIDs FROM `SearchResult` WHERE `SearchCriteriaID` = `@SearchID`;
   CALL ToIntTable(@ProjectIDs);
 
   DROP TEMPORARY TABLE IF EXISTS `stats`;
@@ -1663,6 +1664,164 @@ BEGIN
   PREPARE statement FROM @SQLQuery;
   EXECUTE statement;
   DEALLOCATE PREPARE statement;
+END//
+
+
+/*****************************************************************************************/
+-- PROCEDURE `StoreSearchResults`()
+/*****************************************************************************************/
+
+DROP PROCEDURE IF EXISTS `StoreSearchResults`//
+
+CREATE PROCEDURE `StoreSearchResults` (
+  IN `@ProjectIDList` LONGTEXT,
+  IN `@PageSize` INT,
+  IN `@PageNumber` INT,
+  IN `@SortCol` VARCHAR(50),
+  IN `@SortDirection` VARCHAR(4),
+  IN `@termSearchType` VARCHAR(25),
+  IN `@terms` VARCHAR(4000),
+  IN `@institution` VARCHAR(250),
+  IN `@piLastName` VARCHAR(50),
+  IN `@piFirstName` VARCHAR(50),
+  IN `@piORCiD` VARCHAR(50),
+  IN `@awardCode` VARCHAR(50),
+  IN `@yearList` VARCHAR(1000),
+  IN `@cityList` VARCHAR(1000),
+  IN `@stateList` VARCHAR(1000),
+  IN `@countryList` VARCHAR(1000),
+  IN `@FundingOrgTypeList` VARCHAR(50),
+  IN `@fundingOrgList` VARCHAR(1000),
+  IN `@cancerTypeList` VARCHAR(1000),
+  IN `@projectTypeList` VARCHAR(1000),
+  IN `@CSOList` VARCHAR(1000),
+  IN `@IsChildhood` INT(0),  
+  IN `@ResultCount` INT,  -- return the searchID  
+  OUT `@SearchCriteriaID` INT  -- return the searchID  
+)
+LANGUAGE SQL
+NOT DETERMINISTIC
+CONTAINS SQL
+SQL SECURITY DEFINER
+COMMENT ''
+BEGIN
+  DECLARE `@TotalRelatedProjectCount` INT DEFAULT 0;
+  DECLARE `@LastBudgetYear` INT DEFAULT 0;
+  DECLARE `@PageOffset` INT DEFAULT 0;
+  SET `@PageOffset` = (IFNULL(`@PageNumber`,1)-1)*IFNULL(`@PageSize`,0);
+  SET `@PageSize` = IFNULL(`@PageSize`,18446744073709551615);
+  IF `@SortCol` = NULL THEN
+    SET `@SortCol` = 'title';
+  END IF;
+  IF `@SortDirection` = NULL THEN
+    SET `@SortDirection` = 'ASC';
+  END IF;
+  CALL ToIntTable(`@ProjectIDList`);
+  SELECT COUNT(*),YEAR(MAX(BudgetEndDate))
+  INTO @TotalRelatedProjectCount,@LastBudgetYear
+  FROM `ToIntTable` it
+    JOIN `ProjectFunding` pf ON pf.`ProjectId`=it.`VALUE`;
+  INSERT INTO SearchCriteria (
+    `termSearchType`,
+    `terms`,
+    `institution`,
+    `piLastName`,
+    `piFirstName`,
+    `piORCiD`,
+    `awardCode`,
+    `yearList`,
+    `cityList`,
+    `stateList`,
+    `countryList`,
+    `fundingOrgList`,
+    `cancerTypeList`,
+    `projectTypeList`,
+    `CSOList`,
+    `FundingOrgTypeList`,
+    `IsChildhood`
+  ) VALUES (
+    `@termSearchType`,
+    `@terms`,
+    `@institution`,
+    `@piLastName`,
+    `@piFirstName`,
+    `@piORCiD`,
+    `@awardCode`,
+    `@yearList`,
+    `@cityList`,
+    `@stateList`,
+    `@countryList`,
+    `@fundingOrgList`,
+    `@cancerTypeList`,
+    `@projectTypeList`,
+    `@CSOList`,
+    `@FundingOrgTypeList`,
+    `@IsChildhood`
+  );
+  SELECT LAST_INSERT_ID() INTO `@searchCriteriaID`;
+  INSERT INTO SearchResult (
+    `SearchCriteriaID`,
+    `Results`,
+    `ResultCount`,
+    `TotalRelatedProjectCount`,
+    `LastBudgetYear`
+  ) VALUES (
+    `@SearchCriteriaID`,
+    `@ProjectIDList`,
+    `@ResultCount`,
+    @TotalRelatedProjectCount,
+    @LastBudgetYear
+  );
+  SELECT
+  	 it.`VALUE` AS ProjectID,
+  	 p.`AwardCode`,
+    maxf.`ProjectFundingID` AS LastProjectFundingID,
+	 f.`Title`,
+	 pi.`LastName` AS piLastName,
+	 pi.`FirstName` AS piFirstName,
+	 pi.`ORC_ID` AS piORCiD,
+	 i.`Name` AS institution,
+    f.`Amount`,
+	 i.`City`,
+	 i.`State`,
+	 i.`country`,
+	 o.`FundingOrgID`,
+	 o.`Name` AS FundingOrg,
+	 o.`Abbreviation` AS FundingOrgShort
+  FROM `ToIntTable` it
+    JOIN `Project` p ON p.`ProjectID` = it.`VALUE`
+    JOIN (SELECT `ProjectID`, MAX(`ProjectFundingID`) AS ProjectFundingID FROM `ProjectFunding` f GROUP BY `ProjectID`) maxf ON maxf.`ProjectID` = p.`ProjectID`
+    JOIN `ProjectFunding` f ON f.`ProjectFundingID` = maxf.`ProjectFundingID`
+    JOIN `ProjectFundingInvestigator` pi ON pi.`ProjectFundingID` = f.`ProjectFundingID`
+    JOIN `Institution` i ON i.`InstitutionID` = pi.`InstitutionID`
+    JOIN `FundingOrg` o ON o.`FundingOrgID` = f.`FundingOrgID`
+  ORDER BY
+    CASE WHEN `@SortDirection` = 'ASC' THEN 
+      CASE
+        WHEN `@SortCol` = 'code' THEN p.`AwardCode`
+        WHEN `@SortCol` = 'pi' THEN CONCAT(IFNULL(pi.`LastName`, ""), ' ', IFNULL(pi.`FirstName`, ""))
+        WHEN `@SortCol` = 'Inst' THEN i.`Name`
+        WHEN `@SortCol` = 'city' THEN i.`City`
+        WHEN `@SortCol` = 'state' THEN i.`State`
+        WHEN `@SortCol` = 'country' THEN i.`Country`
+        WHEN `@SortCol` = 'FO' THEN o.`Abbreviation`
+        ELSE f.`Title`
+      END
+    END ASC,
+    CASE WHEN `@SortDirection` = 'DESC' THEN 
+      CASE
+        WHEN `@SortCol` = 'code' THEN p.`AwardCode`
+        WHEN `@SortCol` = 'pi' THEN CONCAT(IFNULL(pi.`LastName`, ""), ' ', IFNULL(pi.`FirstName`, ""))
+        WHEN `@SortCol` = 'Inst' THEN i.`Name`
+        WHEN `@SortCol` = 'city' THEN i.`City`
+        WHEN `@SortCol` = 'state' THEN i.`State`
+        WHEN `@SortCol` = 'country' THEN i.`Country`
+        WHEN `@SortCol` = 'FO' THEN o.`Abbreviation`
+        ELSE f.`Title`
+      END
+    END DESC
+  LIMIT `@PageSize`
+  OFFSET `@PageOffset`;
 END//
 
 
